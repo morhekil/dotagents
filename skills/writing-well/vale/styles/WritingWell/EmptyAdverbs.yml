@@ -1,0 +1,17 @@
+extends: existence
+message: "'%s' is usually empty. Cut it unless it carries real emphasis, uncertainty, contrast, or the writer's spoken rhythm."
+level: suggestion
+ignorecase: true
+tokens:
+  - just
+  - literally
+  - honestly
+  - simply
+  - actually
+  - truly
+  - merely
+  - fundamentally
+  - importantly
+  - crucially
+  - inherently
+  - inevitably

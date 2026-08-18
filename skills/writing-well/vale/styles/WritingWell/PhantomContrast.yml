@@ -1,0 +1,14 @@
+extends: existence
+message: "Phantom contrast: '%s'. Would a reader have believed the rejected half? If not, delete the clause and keep the claim."
+level: warning
+ignorecase: true
+tokens:
+  - rather\s+than\s+merely
+  - rather\s+than\s+just
+  - rather\s+than\s+simply
+  - not\s+merely
+  - not\s+just
+  - more\s+than\s+just
+  - as\s+opposed\s+to
+  - instead\s+of\s+simply
+  - instead\s+of\s+merely

@@ -1,0 +1,7 @@
+extends: existence
+message: "Emoji in a heading. Format follows content; it doesn't decorate it."
+level: error
+scope: heading
+nonword: true
+raw:
+  - '[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}\x{2190}-\x{21FF}]'

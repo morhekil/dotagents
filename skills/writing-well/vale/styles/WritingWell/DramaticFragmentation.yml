@@ -1,0 +1,9 @@
+extends: existence
+message: "Dramatic fragment: '%s'. Use a complete sentence."
+level: warning
+ignorecase: true
+raw:
+  - '\bThat(?:''|’)s\s+it\.'
+  - '|\bThat(?:''|’)s\s+the\s+whole\s+(?:thing|point|trick|story)\.'
+  - '|\bThat(?:''|’)s\s+all\s+(?:there\s+is|of\s+it)\.'
+  - '|(?m)^\s*(?:Full\s+stop|Period|Simple|Easy)\.\s*$'

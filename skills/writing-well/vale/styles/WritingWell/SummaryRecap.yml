@@ -1,0 +1,6 @@
+extends: existence
+message: "Summary-recap opener: '%s'. The reader was just there — end on a concrete point or next action."
+level: warning
+raw:
+  - '(?m)^\s*(?:#+\s*)?(?:In conclusion|In summary|To sum up|To summarize|'
+  - 'All in all|Ultimately|Overall|At the end of the day)\b'

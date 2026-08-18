@@ -1,0 +1,11 @@
+extends: existence
+message: "Faux-insight setup: '%s'. Let the claim stand alone."
+level: error
+ignorecase: true
+tokens:
+  - this\s+is\s+the\s+part\s+most\s+people\s+skip
+  - what\s+most\s+people\s+get\s+wrong
+  - here(?:'|’)s\s+what\s+(?:nobody|no\s+one)\s+tells\s+you
+  - most\s+people\s+(?:don(?:'|’)t|do\s+not)\s+realize
+  - what\s+(?:nobody|no\s+one)\s+(?:talks\s+about|tells\s+you)
+  - the\s+(?:secret|trick)\s+(?:nobody|no\s+one)\s+

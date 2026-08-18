@@ -1,0 +1,11 @@
+extends: existence
+message: "Throat-clearing opener: '%s'. Cut it and state the point."
+level: error
+ignorecase: true
+tokens:
+  - here(?:'|’)s\s+the\s+thing
+  - here(?:'|’)s\s+what\s+I\s+mean
+  - let\s+me\s+be\s+clear
+  - I(?:'|’)ll\s+be\s+honest
+  - to\s+be\s+honest\s+with\s+you
+  - the\s+uncomfortable\s+truth\s+is

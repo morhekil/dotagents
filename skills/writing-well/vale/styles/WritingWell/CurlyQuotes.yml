@@ -1,0 +1,6 @@
+extends: existence
+message: "Curly quote or apostrophe. A tell only when the surrounding text uses straight ones — check for a mix, not for their presence."
+level: suggestion
+nonword: true
+raw:
+  - '[\x{2018}\x{2019}\x{201C}\x{201D}]'

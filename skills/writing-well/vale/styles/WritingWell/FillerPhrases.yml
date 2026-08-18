@@ -1,0 +1,23 @@
+extends: existence
+message: "'%s' is filler. Delete it."
+level: error
+ignorecase: true
+tokens:
+  - it(?:'|’)s\s+worth\s+noting
+  - it\s+is\s+worth\s+noting
+  - it(?:'|’)s\s+important\s+to\s+note
+  - it\s+is\s+important\s+to\s+note
+  - at\s+the\s+end\s+of\s+the\s+day
+  - when\s+it\s+comes\s+to
+  - at\s+its\s+core
+  - in\s+today(?:'|’)s\s+world
+  - in\s+the\s+age\s+of
+  - in\s+the\s+world\s+of
+  - the\s+reality\s+is
+  - the\s+truth\s+is
+  - in\s+terms\s+of
+  - with\s+regard\s+to
+  - in\s+order\s+to
+  - going\s+forward
+  - in\s+this\s+article
+  - let(?:'|’)s\s+dive\s+in

@@ -1,0 +1,8 @@
+extends: readability
+message: "Reading grade level (%s) is high. Be easy, not simple: keep the substance, cut the jargon, long sentences, and abstract nouns."
+level: suggestion
+grade: 11
+metrics:
+  - Flesch-Kincaid
+  - Gunning Fog
+  - Coleman-Liau

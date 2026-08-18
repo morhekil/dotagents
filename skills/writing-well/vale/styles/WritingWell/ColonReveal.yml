@@ -1,0 +1,5 @@
+extends: existence
+message: "Colon reveal: '%s'. Rewrite as a plain sentence; colons are for lists, labels, and quotes."
+level: warning
+raw:
+  - '(?m)^\s*(?:#+\s*|[-*]\s*)?[A-Z][\w''’-]*(?:\s+[\w''’-]+){2,8}:\s+[a-z]'

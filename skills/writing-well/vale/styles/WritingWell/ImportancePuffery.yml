@@ -1,0 +1,14 @@
+extends: existence
+message: "Importance puffery: '%s'. State the fact and let the reader judge."
+level: error
+ignorecase: true
+tokens:
+  - stands\s+as\s+a\s+testament
+  - a\s+testament\s+to
+  - marks\s+a\s+(?:pivotal|significant|defining|watershed)\s+moment
+  - plays\s+a\s+(?:vital|crucial|key|pivotal|central)\s+role
+  - solidifies\s+its\s+(?:position|place|status)
+  - cements\s+its\s+(?:position|place|status|legacy)
+  - enduring\s+legacy
+  - underscores\s+the\s+importance
+  - highlights\s+the\s+importance

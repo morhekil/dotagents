@@ -1,0 +1,13 @@
+extends: existence
+message: "Binary contrast: '%s'. State the positive claim directly."
+level: warning
+ignorecase: true
+raw:
+  # "This is not X. It's Y." / "This isn't X. It's Y."
+  - '\b(?:it|this|that)(?:''|’)?s?\s+(?:is\s+not|isn(?:''|’)t|are\s+not|aren(?:''|’)t|was\s+not|wasn(?:''|’)t|not)\s+[^.,;]{1,45}[.,;]\s*(?:it|this|that)(?:''|’)?s?\s+(?:is\s+)?\w'
+  # "The question isn't X, it's Y."
+  - '|\b(?:the\s+[\w-]+|it|this|that)\s+(?:isn(?:''|’)t|is\s+not|wasn(?:''|’)t|was\s+not)\s+[^.,;]{1,45}[,;]\s*it(?:''|’)?s?\b'
+  # "not just X but Y"
+  - '|\bnot\s+(?:just|only|simply|merely)\s+[^.,;]{1,45}\s+but\b'
+  # "Not a linter. Not a formatter. A compiler."
+  - '|(?m)^\s*Not\s+an?\s+[\w-]+[.,]\s+Not\s+an?\s+[\w-]+[.,]'

@@ -1,0 +1,10 @@
+extends: existence
+message: "Significance tag: '%s'. Delete it, or state the mechanism that makes it true."
+level: warning
+ignorecase: true
+raw:
+  - '(?:,|;)?\s*(?:and|which)\s+(?:that|this|it)?(?:''|’)?s?\s*(?:is|was)?\s*'
+  - '(?:the\s+point|the\s+whole\s+point|deliberate|by\s+design|intentional|'
+  - 'not\s+an\s+accident|no\s+accident|the\s+thing)\b'
+  - '|(?:,|;)\s*and\s+(?:its|his|her|their|the)\s+[\w-]+\s+is\s+the\s+point\b'
+  - '|\band\s+that\s+matters\b'

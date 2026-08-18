@@ -1,0 +1,14 @@
+extends: existence
+message: "Fake-strong verb: '%s'. Prefer 'is' or 'has' when it's clearer."
+level: warning
+ignorecase: true
+tokens:
+  - serves\s+as
+  - acts\s+as\s+an?
+  - functions\s+as\s+an?
+  - stands\s+as\s+an?
+  - represents\s+an?
+  - constitutes\s+an?
+  - provides\s+a\s+means
+  - centralized\s+hub
+  - one-stop\s+shop

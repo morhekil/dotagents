@@ -1,0 +1,8 @@
+extends: sequence
+message: "Passive voice: '%s'. Prefer an active verb with a human subject."
+level: suggestion
+ignorecase: true
+tokens:
+  - pattern: '(?:am|are|is|be|been|being|was|were)'
+  - tag: VBN
+    target: true

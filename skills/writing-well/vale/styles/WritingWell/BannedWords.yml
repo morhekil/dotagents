@@ -1,0 +1,33 @@
+extends: existence
+message: "'%s' is on the banned list. Name the concrete thing instead."
+level: error
+ignorecase: true
+tokens:
+  - delve
+  - foster
+  - leverage
+  - utilize
+  - facilitate
+  - empower
+  - streamline
+  - robust
+  - cutting-edge
+  - paradigm\s+shift
+  - game\s+changer
+  - this\s+is\s+huge
+  - this\s+changes\s+everything
+  - tapestry
+  - realm
+  - beacon
+  - multifaceted
+  - meticulous
+  - intricate
+  - paramount
+  - transformative
+  - elevate
+  - embark
+  - supercharge
+  - harness
+  - ever-evolving
+  - groundbreaking
+  - seamless

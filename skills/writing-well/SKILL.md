@@ -55,6 +55,10 @@ Applied:
 
 ## Words to cut
 
+<!-- vale WritingWell.BannedWords = NO -->
+<!-- vale WritingWell.EmptyAdverbs = NO -->
+<!-- vale WritingWell.FillerPhrases = NO -->
+
 **Banned outright:** delve, foster, leverage, utilize, facilitate, empower, streamline, robust, cutting-edge, paradigm shift, game changer, this is huge, this changes everything, tapestry, realm, beacon, multifaceted, meticulous, intricate, paramount, transformative, elevate, embark, supercharge, harness, ever-evolving, groundbreaking, seamless.
 
 **Often-empty adverbs:** just, literally, honestly, simply, actually, truly, merely, fundamentally, importantly, crucially, inherently, inevitably.
@@ -62,6 +66,10 @@ Applied:
 **Often-empty phrases:** it's worth noting, it's important to note, at the end of the day, when it comes to, at its core, in today's world, in the age of, in the world of, the reality is, the truth is, in terms of, with regard to, in order to, going forward, in this article, let's dive in.
 
 When writing, cut all of these. When editing, keep an adverb or phrase that carries real emphasis, uncertainty, contrast, or the writer's spoken rhythm.
+
+<!-- vale WritingWell.BannedWords = YES -->
+<!-- vale WritingWell.EmptyAdverbs = YES -->
+<!-- vale WritingWell.FillerPhrases = YES -->
 
 ## Patterns to cut
 
@@ -122,14 +130,37 @@ These govern the **Edit** job only. When drafting your own prose, ignore them an
 - **Preserve useful edge.** Strong opinions, blunt language, humor, profanity, self-interruptions, and honest admissions belong to the writer. Do not make them safer or more professional.
 - **Keep the structure** unless it is hurting the piece. If you reorganize, say why in **What changed**.
 
+## Mechanical pass
+
+Optional, and only if `vale` is on PATH. It catches the token-level patterns above without tiring on a long draft; you supply every judgment it cannot make. If Vale is absent, skip this step and change nothing else.
+
+```
+vale --no-global --config=<this skill's directory>/vale/.vale.ini --output=JSON draft.md
+```
+
+A pasted draft goes in on stdin with `--ext=.md`. Read the output rather than the exit code — only `error` returns non-zero.
+
+Every alert is a candidate, not a finding. The level says how much judgment it needs:
+
+| Level | Meaning | Response |
+|---|---|---|
+| `error` | The phrase is slop wherever it lands | Fix it, unless the draft is quoting it as a specimen |
+| `warning` | A tell that depends on context | Apply the necessity test from *Detect* before acting |
+| `suggestion` | Frequent in good prose too | Act on density, or when the sentence is weak anyway |
+
+Vale reaches about half of *Patterns to cut* and none of *Editing principles*. It cannot see concreteness, voice, synonym cycling, fake-profound kickers, or whether a device earns its place. Treat a clean run as the start of your read, not the end of it.
+
+Never hand Vale's output to the user as your findings. In **Detect**, name the pattern in your own words against the quoted line, exactly as you would without it. `vale/README.md` covers the rules, the vocabulary escape hatch, and what the style misses.
+
 ## Workflow
 
 1. Read the whole draft before touching anything.
 2. Identify the core point and three to five voice signals to preserve. Keep this note internal. If you cannot find the core point, ask.
-3. **Detect request:** return the findings report described above and stop.
-4. **Edit or write:** make the changes, then check your output against `eval.md` yourself.
-5. If any check fails, fix and re-check.
-6. Output the full draft, plus a **What changed** section when editing.
+3. Run the mechanical pass if Vale is available, and hold its alerts as candidates.
+4. **Detect request:** return the findings report described above and stop.
+5. **Edit or write:** make the changes, then check your output against `eval.md` yourself.
+6. If any check fails, fix and re-check.
+7. Output the full draft, plus a **What changed** section when editing.
 
 ## Reference files
 
@@ -143,6 +174,7 @@ Load only what the task needs.
 | `elements-of-style/05-words-and-expressions-commonly-misused.md` | 4,000 | Word choice, common errors |
 | `elements-of-style/04-a-few-matters-of-form.md` | 1,000 | Headings, quotations, formatting |
 | `signs-of-ai-writing.md` | 25,000 | Wikipedia editors' field guide — deep audits only |
+| `vale/README.md` | 800 | Tuning or debugging the mechanical pass |
 
 Most tasks need only `eval.md`. When the prose needs real work, add `03-elementary-principles-of-composition.md`.
 

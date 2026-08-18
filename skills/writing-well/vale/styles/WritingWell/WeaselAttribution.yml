@@ -1,0 +1,14 @@
+extends: existence
+message: "Weasel attribution: '%s'. Name the source, or ask the writer for it. Never invent one."
+level: warning
+ignorecase: true
+tokens:
+  - experts\s+(?:agree|say|believe|note)
+  - studies\s+(?:show|suggest|indicate)
+  - research\s+(?:shows|suggests|indicates)
+  - industry\s+reports\s+suggest
+  - widely\s+(?:regarded|considered|seen)\s+as
+  - it\s+is\s+(?:widely\s+)?believed
+  - many\s+(?:believe|argue|say)
+  - some\s+(?:argue|say|would\s+say)
+  - critics\s+(?:say|argue|note)

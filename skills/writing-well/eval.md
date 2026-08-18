@@ -52,3 +52,4 @@ For detect requests, only the Detect section applies.
 1. Would the writer recognize this as their own voice?
 2. Would it sound natural read aloud to a sharp colleague?
 3. Did you check the output against this file directly, without needing a separate evaluator agent?
+4. If Vale was available, does the mechanical pass come back clean at error level, with every remaining warning one you decided to keep?

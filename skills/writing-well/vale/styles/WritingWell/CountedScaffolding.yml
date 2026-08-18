@@ -1,0 +1,8 @@
+extends: existence
+message: "Counted scaffolding: '%s'. Keep the count only when the reader must track a fixed set."
+level: warning
+raw:
+  - '(?m)(?:^|\.\s+)(?:Two|Three|Four|Five|Six|Seven)\s+'
+  - '(?:details|reasons|ideas|things|points|ways|lessons|takeaways|'
+  - 'principles|rules|questions|examples|patterns|problems|options|'
+  - 'steps|factors|forces|shifts|moves)\b'

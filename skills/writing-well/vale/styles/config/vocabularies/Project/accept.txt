@@ -1,0 +1,6 @@
+# One regex per line. Anything listed here is exempt from every WritingWell
+# rule — the escape hatch for a word this project uses in its literal sense.
+#
+# Examples:
+#   [Hh]arness      # "the agent harness", not the verb
+#   (?i)realm       # a game with realms in it

@@ -1,0 +1,8 @@
+extends: existence
+message: "Superficial '-ing' analysis: '%s'. Say what actually follows from the fact."
+level: error
+ignorecase: true
+raw:
+  - ',\s*(?:highlighting|underscoring|reflecting|showcasing|ensuring|'
+  - 'demonstrating|emphasizing|signaling|signalling|marking|cementing|'
+  - 'illustrating|cementing|solidifying|reinforcing)\s'

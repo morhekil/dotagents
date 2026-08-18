@@ -1,0 +1,6 @@
+extends: occurrence
+message: "Too many em dashes. None in short copy; one or two in a longer draft, and only when they beat a comma, period, or parentheses."
+level: warning
+scope: summary
+max: 2
+token: '—'

@@ -28,9 +28,26 @@ writing-well/
     03-elementary-principles-of-composition.md
     04-a-few-matters-of-form.md
     05-words-and-expressions-commonly-misused.md
+  vale/                    # Optional mechanical pass (see below)
+    .vale.ini
+    README.md
+    styles/WritingWell/    # 24 rules
 ```
 
 Progressive disclosure: SKILL.md carries the working rules, references load on demand. Most tasks need only `eval.md`; add `03-elementary-principles-of-composition.md` when the prose needs real work.
+
+## Mechanical pass
+
+If [Vale](https://vale.sh) is installed, the skill runs it first as a recall pass:
+
+```
+brew install vale
+vale --no-global --config=writing-well/vale/.vale.ini --output=JSON draft.md
+```
+
+Twenty-four rules encode the token-level half of SKILL.md — the word lists, phantom contrasts, significance tags, binary contrasts, colon reveals, superficial `-ing` clauses, em-dash count, emoji and title-case headings. Alert levels say how much judgment each needs: `error` is slop wherever it lands, `warning` is a tell to check in context, `suggestion` is common in good prose too.
+
+On 600 lines of Strunk the style produces 1 error and 7 warnings; on a slop draft of 21 lines, 33 alerts. It reaches none of the editing principles and half the patterns, so its output enters as candidates the model judges, never as findings. Skip the install and nothing changes. `vale/README.md` has the details.
 
 ## Examples
 

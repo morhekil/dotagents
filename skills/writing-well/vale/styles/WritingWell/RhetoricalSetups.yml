@@ -1,0 +1,11 @@
+extends: existence
+message: "Rhetorical setup: '%s'. Drop it and make the claim."
+level: error
+ignorecase: true
+tokens:
+  - what\s+if\s+I\s+told\s+you
+  - 'think\s+about\s+it:'
+  - 'plot\s+twist:'
+  - 'spoiler(?:\s+alert)?:'
+  - but\s+here(?:'|’)s\s+where\s+it\s+gets
+  - and\s+that(?:'|’)s\s+when\s+it\s+(?:hit|clicked)

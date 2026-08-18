@@ -1,0 +1,12 @@
+extends: existence
+message: "Editorial signposting: '%s'. Name the mechanism or the risk instead."
+level: warning
+ignorecase: true
+tokens:
+  - worth\s+(?:knowing|noticing|noting|a\s+look|paying\s+attention)
+  - the\s+(?:interesting|important|clever|surprising)\s+(?:part|bit|thing)
+  - a\s+(?:neat|nice|clever)\s+(?:inversion|trick|touch)
+  - keep\s+an\s+eye\s+on
+  - deserves\s+a\s+(?:look|mention)
+  - the\s+[\w-]+\s+that\s+matters
+  - pay\s+attention\s+(?:here|to\s+this)
