@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub PR Comments"
+  short_description: "Address GitHub PR review comments"
+  default_prompt: "Use $github-pr-comments to read and address all actionable human comments on this GitHub pull request."
