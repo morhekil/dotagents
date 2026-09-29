@@ -21,7 +21,6 @@ Frontmatter:
 ---
 title: Short imperative title
 status: backlog            # todo | in-progress  (omit `status` if todo)
-type: task              # task | bug | idea  (omit if task)
 priority: high          # low | normal | high  (omit if normal)
 parent: 20260501T0900-some-stuff  # optional, to group under another task
 created_at: 2026-05-22T14:30:00+10:00
@@ -36,7 +35,7 @@ Body is free-form markdown: problem statement, rough approach, acceptance criter
 
 ### Create
 
-1. If `.tasks/` doesn't exist, create it.
+1. Check if `.tasks` directory already exists in the current repo. If it doesn't - check if there is .tasks git repo one directory up. If neither `.tasks/` exists - create it in the current repository.
 2. Compute the filename from the current local time and a slug derived from task's description.
 3. Write the file with frontmatter + body.
 4. Stage and commit immediately.
@@ -45,11 +44,11 @@ Task can be create as a one-line description if that's all that is known at the 
 
 ### List
 
-`ls .tasks/*.md`, read frontmatter from each. Filename sort gives newest-last; reverse for newest-first. Show title, status, type, priority. Group by `parent` when relevant.
+`ls .tasks/*.md`, read frontmatter from each. Filename sort gives newest-last; reverse for newest-first. Show title, status, priority. Group by `parent` when relevant.
 
 ### Plan
 
-Edit an existing file in place. When an `idea` gains enough detail to act on (problem clear, approach sketched, success criterion stated), change `type: idea` to `type: task` (or remove the field, since task is default).
+Edit an existing file in place.
 
 ### Update status
 
@@ -57,7 +56,7 @@ Edit an existing file in place. When an `idea` gains enough detail to act on (pr
 
 ### Complete
 
-Complete the task when its work scope is completed, in the same git commit.
+Complete the task when its work scope is completed, in the same git commit if it's the same repo, or referencing the commit if it's in a parent repo.
 
 ```
 git rm .tasks/<filename>
