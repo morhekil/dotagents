@@ -25,6 +25,8 @@ Before implementing:
 
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
+Use /ponytail skill to assist.
+
 # 3. Surgical Changes
 
 **Touch only what you must. Clean up only your own mess.**
@@ -58,3 +60,11 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+# 5. Comments
+
+**Only write comments which help to understand things that are uncler**
+
+Only write comments when something is not clear from the actual configuration
+code. And if and when you do need to write a comment - it must describe the
+current present state, not what code used to be and isn't anymore
