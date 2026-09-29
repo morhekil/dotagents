@@ -5,11 +5,18 @@ description: Code writing skill enforcing red/green/refactor TDD workflow with c
 
 # TDD Code Writing Workflow
 
-When writing code, follow the red/green/refactor cycle strictly. Every feature or change begins with a failing test.
+When writing code, follow the red/green/refactor cycle strictly. Every feature or change in the code begins with a failing test.
 A TDD cycle is not complete until refactoring has been done and green state is committed.
 
 This skill's commit gate overrides any default habit of deferring commits unless the user explicitly says not to commit.
 Requests like "continue implementation" do not permit batching multiple TDD cycles into one uncommitted patch.
+
+To not write tests related to shape of code, and not its functional behaviour:
+
+* do not assert that a file is in a certain location;
+* do not assert that a certain config line exists.
+
+Tests must pin functionality (how code works), not shape (what code looks like).
 
 ## Workflow
 
