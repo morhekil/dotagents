@@ -1,5 +1,6 @@
 ---
 title: Trial selective Supermemory retrieval in Codex and Claude
+status: in-progress
 created_at: 2026-10-20T11:19:50+11:00
 ---
 
