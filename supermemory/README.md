@@ -19,6 +19,13 @@ Supermemory status line are disabled. Native memory remains enabled. The same
 retrieval policy is installed in `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md`.
 Existing sessions must be replaced to discard already injected context.
 
+Claude Code also imported a separate `claude.ai Supermemory` connector. A
+targeted `deniedMcpServers` entry blocks that duplicate in terminal/IDE sessions;
+otherwise a failed configured server could silently switch to another archive.
+Other connectors remain enabled. Claude desktop's in-process connectors have
+different controls; they are outside this terminal/IDE configuration and need
+separate verification before including that surface in the trial.
+
 Run the credential checks with:
 
 ```sh
@@ -29,6 +36,11 @@ The trial starts only after the parent task's fresh-session matrix passes.
 Its local manifest records the actual start time, evidence, versions, backups,
 and any remaining limitations. The parent task stays open for the evaluation.
 At the checkpoint, request `audit the Supermemory trial`; no scheduler is used.
+
+The CLI-verified trial started on 20 October 2026 at 17:54:20 +11:00. Its
+checkpoint is 3 November, with a 17 November cap. Setup probes are excluded.
+The manifest records verification limits; separate desktop in-process cloud
+connectors are not counted as verified. Start fresh sessions for trial work.
 
 ## Rollback
 

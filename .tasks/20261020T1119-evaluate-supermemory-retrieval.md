@@ -170,3 +170,55 @@ Deliverable: a concise recommendation for Codex, Claude, and the shared service,
 - Claude independent MCP registration, scopes, and authentication: https://code.claude.com/docs/en/mcp
 - Supermemory's standalone MCP endpoint: https://supermemory.ai/mcp/
 - Installed local code and live configuration take precedence over examples describing newer plugin behavior.
+
+## Implementation and trial state, 20 October 2026
+
+The CLI-verified trial started at **2026-10-20 17:54:20 +11:00**. Checkpoint:
+**3 November 2026**, targeting 20 eligible tasks and at least five per client.
+The four-week cap is **17 November 2026**. Setup probes precede the start time
+and are excluded from the evaluation. This parent stays open until the audit
+and resulting keep/remove configuration are complete.
+
+- Codex retains its original MCP registration and narrow read-only approval
+  hook. Its Supermemory SessionStart, UserPromptSubmit and Stop commands were
+  removed; Superset remains. Defensive `recallMode` is `off`.
+- Claude uses independent HTTP MCP registration with a small tested credential
+  helper. The plugin and its status line are disabled. A targeted deny blocks
+  the separate imported `claude.ai Supermemory` connector, which otherwise
+  became a fallback when the configured server was unavailable.
+- Both effective instruction files contain the same selective retrieval
+  policy, including explicit container scope, source attribution, and checking
+  the credential inherited by the MCP process. A login shell loading direnv
+  later does not establish that the existing MCP connection uses that key.
+- Fresh sessions verified simple edits without searches, unprompted historical
+  retrieval in both clients, shared source access, sibling-worktree scope,
+  rejection of false user-decision attributions, and unavailable-service
+  handling. A RedStar session missing its inherited key stopped before any
+  memory search. Repeated fresh processes retained the configuration.
+- The helper was developed test-first: five failing checks, implementation,
+  then five passing checks. Tests cover saved credentials, environment priority,
+  and failure without credential output. No dependency was added.
+
+Local evidence, native transcript references, project mappings, original and
+installed configuration hashes, restricted backups and the start manifest:
+`~/.local/state/supermemory-trial/20261020T174255+1100/`. No raw transcript or
+credential was committed. The October baseline was preserved and checked:
+306 root Codex sessions among 510 records, and 168 Claude sessions.
+
+Versioned implementation and operating instructions are in
+[`../supermemory/README.md`](../supermemory/README.md),
+[`../supermemory/policy.md`](../supermemory/policy.md), and the helper tests.
+Initial helper commit: `64002f2`; initial policy commit: `896b027`.
+
+Verification covers the installed CLI/terminal clients. Separate desktop
+in-process cloud connectors have different controls and remain unverified;
+do not count that surface as tested. The running Claude desktop parent lacked
+the RedStar variables. Existing sessions can retain injected context or loaded
+hooks, so use fresh sessions for trial work and exclude any old-session uploads
+at audit. Native memory, the remote archive, and other connectors were retained.
+No scheduler, daemon, or future audit parser was installed.
+
+An implementation diagnostic exposed the RedStar Supermemory key in tool
+output. Rotation is tracked separately in
+[`20261020T1752-rotate-supermemory-redstar-key.md`](20261020T1752-rotate-supermemory-redstar-key.md).
+Do not revoke it as part of this trial without checking its consumers.
