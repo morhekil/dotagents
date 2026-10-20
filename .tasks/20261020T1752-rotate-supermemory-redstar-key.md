@@ -2,7 +2,7 @@
 title: Rotate the RedStar Supermemory API key
 priority: high
 parent: 20261020T1119-evaluate-supermemory-retrieval
-created_at: 2026-10-20T18:00:00+11:00
+created_at: 2026-10-20T17:52:40+11:00
 ---
 
 An implementation diagnostic printed the RedStar Supermemory key from
