@@ -1,0 +1,726 @@
+#!/usr/bin/env python3
+"""promo — file promo graphics from a designer's Google Drive link into promos-v5.
+
+The mechanical half of the pipeline. Everything here is deterministic and
+repeatable; the judgement (which file is which promotion, language and
+placement) lives in the manifest, which a human or an LLM writes.
+
+    promo fetch <drive-url>        download a public Drive folder to staging
+    promo inventory <dir>          probe every image; print a classification table
+    promo thumbs <files...>        small JPEGs of ambiguous files, for eyeballing
+    promo apply <manifest.json>    convert, minify and file (dry-run unless --force)
+    promo check <promo-folder>     validate a filed promotion against the convention
+
+Never reads the contents of Dropbox online-only placeholders: 35% of the
+archive's upload/ files are stubs, and probing them would pull the lot down.
+"""
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+ARCHIVE = os.environ.get(
+    "PROMOS_ROOT",
+    os.path.expanduser("~/RedStar Dropbox/RedStar Promo Graphics/promos-v5"),
+)
+
+HERO_SIZES = {(2360, 760)}
+PROMO_SIZES = {(2360, 440), (1160, 300), (760, 300)}
+JPEG_QUALITY = 94
+JPEG_SAMPLING = "1x1,1x1,1x1"          # 4:4:4 — banners carry sharp text
+PNGQUANT_QUALITY = "60-95"
+LANGS = ("EN", "RU", "ES", "UK", "DE")
+
+# Designers write these; the convention wants the two-letter form.
+LANG_ALIASES = {
+    "ENG": "EN", "ENGLISH": "EN", "EN": "EN",
+    "RUS": "RU", "RUSSIAN": "RU", "RU": "RU",
+    "UKR": "UK", "UA": "UK", "UK": "UK", "UKRAINIAN": "UK",
+    "ESP": "ES", "SPANISH": "ES", "ES": "ES",
+    "GER": "DE", "DEU": "DE", "GERMAN": "DE", "DE": "DE",
+}
+
+FILENAME_RE = re.compile(
+    r"^(?P<name>.+?)_(?P<w>\d{3,4})x(?P<h>\d{3,4})(?:_(?P<lang>[A-Z]{2}))?"
+    r"\.(?P<ext>png|jpg)$"
+)
+FOLDER_RE = re.compile(r"^\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+RASTER = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".tif", ".tiff", ".bmp"}
+SOURCE_EXT = {".psd", ".psb", ".ai", ".eps", ".sketch", ".fig", ".afdesign"}
+JUNK = {".ds_store", "icon\r", "thumbs.db", "desktop.ini"}
+
+
+# ---------------------------------------------------------------- helpers
+
+class Fail(Exception):
+    pass
+
+
+def run(cmd, **kw):
+    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+
+def have(binary):
+    return shutil.which(binary) is not None
+
+
+def require(*binaries):
+    missing = [b for b in binaries if not have(b)]
+    if missing:
+        raise Fail(
+            "missing required tool(s): %s\n  install with: brew install %s"
+            % (", ".join(missing), " ".join(missing))
+        )
+
+
+def is_placeholder(path):
+    """True for a Dropbox online-only stub. Reading one downloads it."""
+    out = run(["xattr", path]).stdout
+    return "com.dropbox.placeholder" in out
+
+
+def is_junk(name):
+    return name.lower() in JUNK or name.startswith("._")
+
+
+def human(n):
+    for unit in ("B", "K", "M", "G"):
+        if n < 1024 or unit == "G":
+            return f"{n:.0f}{unit}" if unit == "B" else f"{n:.1f}{unit}"
+        n /= 1024.0
+
+
+def probe(path):
+    """Dimensions, format and opacity of one image. Reads content."""
+    spec = path + "[0]" if os.path.splitext(path)[1].lower() in SOURCE_EXT else path
+    r = run(["identify", "-format", "%w %h %m %[opaque]", spec])
+    if r.returncode != 0:
+        return None
+    parts = r.stdout.split()
+    if len(parts) < 3:
+        return None
+    return {
+        "w": int(parts[0]),
+        "h": int(parts[1]),
+        "fmt": parts[2].upper(),
+        "opaque": (parts[3].lower() == "true") if len(parts) > 3 else True,
+    }
+
+
+def placement_for(w, h):
+    if (w, h) in HERO_SIZES:
+        return "hero"
+    if (w, h) in PROMO_SIZES:
+        return "promo"
+    return "off-spec"
+
+
+def guess_lang(rel):
+    """Pull a language out of a path, tolerating designer spellings.
+
+    Checks the filename first, then the folders above it — designers put the
+    language in either place (`main_RU.png` or `RUS/main.png`).
+    """
+    parts = rel.replace("\\", "/").split("/")
+    for segment in reversed(parts):
+        tokens = re.split(r"[^A-Za-z]+", os.path.splitext(segment)[0])
+        for tok in reversed(tokens):
+            if tok and tok.upper() in LANG_ALIASES:
+                return LANG_ALIASES[tok.upper()]
+    return None
+
+
+def walk_files(root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d != "__MACOSX" and not d.startswith(".")]
+        for fn in sorted(filenames):
+            if is_junk(fn):
+                continue
+            yield os.path.join(dirpath, fn)
+
+
+# ---------------------------------------------------------------- fetch
+
+def cmd_fetch(args):
+    here = os.path.dirname(os.path.abspath(__file__))
+    python = args.python or os.path.join(here, "gd", "bin", "python")
+    helper = os.path.join(here, "_fetch.py")
+    if not os.path.exists(python):
+        raise Fail(
+            "bundled gdown venv missing. Recreate it with:\n"
+            "  uv venv %s/gd && uv pip install --python %s/gd/bin/python gdown"
+            % (here, here)
+        )
+
+    dest = os.path.abspath(args.to)
+    os.makedirs(dest, exist_ok=True)
+    mode = "list" if args.list else ("images" if args.images_only else "all")
+
+    print(f"→ listing folder…", file=sys.stderr)
+    r = run([python, helper, args.url, dest, mode])
+    try:
+        result = json.loads(r.stdout)
+    except json.JSONDecodeError:
+        raise Fail(
+            "could not read the folder listing.\n"
+            "  gdown said: %s\n"
+            "  If the link is not 'anyone with the link', anonymous download cannot\n"
+            "  work — ask the designer to loosen sharing, or download it by hand and\n"
+            "  run `promo inventory <dir>` on the local copy."
+            % (r.stderr.strip().splitlines()[-1] if r.stderr.strip() else "nothing")
+        )
+
+    if "error" in result:
+        raise Fail(
+            "%s\n  If the link is not 'anyone with the link', anonymous download\n"
+            "  cannot work — ask the designer to loosen sharing." % result["error"]
+        )
+
+    items = result["items"]
+    by_kind = {}
+    for i in items:
+        by_kind.setdefault(i["kind"], []).append(i)
+
+    if args.list:
+        print(f"\n{len(items)} file(s) in the folder:\n")
+        for i in items:
+            print(f"  {i['kind']:<7} {i['path']}")
+        print("\nNothing downloaded. Re-run without --list to fetch,")
+        print("or add --with-sources to include PSDs and other working files.")
+        return 0
+
+    done, failed = result["downloaded"], result["failed"]
+    skipped = result["skipped"]
+    total = sum(os.path.getsize(i["local"]) for i in done if os.path.exists(i["local"]))
+    print(f"\n→ fetched {len(done)} file(s), {human(total)} into {dest}", file=sys.stderr)
+
+    if skipped:
+        kinds = {}
+        for i in skipped:
+            kinds[i["kind"]] = kinds.get(i["kind"], 0) + 1
+        print("→ skipped %s — --images-only was passed, so working files were left"
+              % ", ".join(f"{n} {k}" for k, n in sorted(kinds.items())), file=sys.stderr)
+        print("  in Drive. Re-run without it to fetch them into source/.", file=sys.stderr)
+
+    if failed:
+        print(f"\n! {len(failed)} file(s) failed:", file=sys.stderr)
+        for i in failed:
+            print(f"    {i['path']}: {i.get('error', 'no data returned')}", file=sys.stderr)
+
+    print(f"\nNext:  promo inventory {dest}", file=sys.stderr)
+    return 1 if failed else 0
+
+
+# ---------------------------------------------------------------- inventory
+
+def collect_inventory(root):
+    rows = []
+    for path in walk_files(root):
+        ext = os.path.splitext(path)[1].lower()
+        rel = os.path.relpath(path, root)
+        size = os.path.getsize(path)
+        row = {
+            "path": path, "rel": rel, "ext": ext, "bytes": size,
+            "kind": None, "w": None, "h": None, "fmt": None,
+            "opaque": None, "lang": guess_lang(rel),
+        }
+        if ext in SOURCE_EXT:
+            row["kind"] = "source"
+            info = probe(path)
+            if info:
+                row.update(w=info["w"], h=info["h"], fmt=info["fmt"])
+        elif ext in RASTER:
+            info = probe(path)
+            if not info:
+                row["kind"] = "unreadable"
+            else:
+                row.update(w=info["w"], h=info["h"], fmt=info["fmt"], opaque=info["opaque"])
+                row["kind"] = placement_for(info["w"], info["h"])
+        else:
+            row["kind"] = "other"
+        rows.append(row)
+    return rows
+
+
+def cmd_inventory(args):
+    require("identify")
+    root = os.path.abspath(args.dir)
+    if not os.path.isdir(root):
+        raise Fail(f"not a directory: {root}")
+    rows = collect_inventory(root)
+    if not rows:
+        raise Fail(f"no files found under {root}")
+
+    if args.json:
+        print(json.dumps({"root": root, "files": rows}, indent=2))
+        return 0
+
+    print(f"root: {root}")
+    print(f"{len(rows)} files\n")
+    w_rel = min(max((len(r["rel"]) for r in rows), default=20), 72)
+    hdr = f"{'#':>3}  {'kind':<9} {'dims':<11} {'fmt':<5} {'lang':<4} {'alpha':<5} {'size':>7}  path"
+    print(hdr)
+    print("-" * len(hdr))
+    for i, r in enumerate(rows, 1):
+        dims = f"{r['w']}x{r['h']}" if r["w"] else ""
+        alpha = "" if r["opaque"] is None else ("no" if r["opaque"] else "YES")
+        print(
+            f"{i:>3}  {r['kind']:<9} {dims:<11} {(r['fmt'] or ''):<5} "
+            f"{(r['lang'] or ''):<4} {alpha:<5} {human(r['bytes']):>7}  {r['rel'][:w_rel]}"
+        )
+
+    kinds = {}
+    for r in rows:
+        kinds[r["kind"]] = kinds.get(r["kind"], 0) + 1
+    print("\nsummary: " + ", ".join(f"{k}={v}" for k, v in sorted(kinds.items())))
+    offspec = [r for r in rows if r["kind"] == "off-spec"]
+    if offspec:
+        print(f"\n{len(offspec)} off-spec size(s) — decide placement by hand:")
+        for r in offspec:
+            print(f"  {r['w']}x{r['h']}  {r['rel']}")
+    noalpha = [r for r in rows if r["opaque"] is False and r["kind"] == "promo"]
+    if noalpha:
+        print(f"\n{len(noalpha)} promo-size file(s) carry real transparency.")
+        print("  These become JPG, which has no alpha — set \"background\" on those")
+        print("  manifest entries (e.g. \"#000000\") or apply will refuse them.")
+    return 0
+
+
+# ---------------------------------------------------------------- thumbs
+
+def cmd_thumbs(args):
+    require("magick")
+    out = os.path.abspath(args.out)
+    os.makedirs(out, exist_ok=True)
+    made = []
+    for src in args.files:
+        if not os.path.exists(src):
+            print(f"! missing: {src}", file=sys.stderr)
+            continue
+        spec = src + "[0]" if os.path.splitext(src)[1].lower() in SOURCE_EXT else src
+        base = re.sub(r"[^A-Za-z0-9._-]+", "_", os.path.basename(src))
+        dst = os.path.join(out, os.path.splitext(base)[0] + ".jpg")
+        r = run(["magick", spec, "-background", "white", "-alpha", "remove",
+                 "-alpha", "off", "-resize", f"{args.width}x>", "-quality", "70", dst])
+        if r.returncode != 0:
+            print(f"! thumb failed: {src}\n  {r.stderr.strip()}", file=sys.stderr)
+            continue
+        made.append(dst)
+        print(dst)
+    if not made:
+        raise Fail("no thumbnails produced")
+    return 0
+
+
+# ---------------------------------------------------------------- apply
+
+def target_op(dest_rel):
+    """What apply will do to a file, from its destination alone."""
+    parts = dest_rel.replace("\\", "/").split("/")
+    ext = os.path.splitext(dest_rel)[1].lower()
+    if parts[0] == "source":
+        return "copy"
+    if parts[:2] == ["upload", "hero"] and ext == ".png":
+        return "png"
+    if parts[:2] == ["upload", "promo"] and ext == ".jpg":
+        return "jpg"
+    return None
+
+
+def plan_manifest(manifest, allow_dim_mismatch=False, allow_offspec=False):
+    """Resolve a manifest into concrete operations, or raise with every problem."""
+    problems, plan, seen = [], [], {}
+
+    promos = manifest.get("promotions")
+    if not isinstance(promos, list) or not promos:
+        raise Fail("manifest has no 'promotions' list")
+
+    for p in promos:
+        folder = p.get("folder", "")
+        if not FOLDER_RE.match(folder):
+            problems.append(
+                f"folder name '{folder}' does not match YYYYMM-vertical-name "
+                "(lowercase, hyphens, no dots)"
+            )
+        for entry in p.get("files", []):
+            src, dest_rel = entry.get("src"), entry.get("dest")
+            if not src or not dest_rel:
+                problems.append(f"[{folder}] entry missing src or dest: {entry}")
+                continue
+            if not os.path.exists(src):
+                problems.append(f"[{folder}] src does not exist: {src}")
+                continue
+
+            op = target_op(dest_rel)
+            if op is None:
+                problems.append(
+                    f"[{folder}] dest must be upload/hero/*.png, upload/promo/*.jpg "
+                    f"or source/* — got {dest_rel}"
+                )
+                continue
+
+            base = os.path.basename(dest_rel)
+            m = FILENAME_RE.match(base)
+            if op != "copy":
+                if not m:
+                    problems.append(
+                        f"[{folder}] filename '{base}' does not match "
+                        "<Name>_<W>x<H>[_<LANG>].<ext>"
+                    )
+                    continue
+                if m.group("lang") and m.group("lang") not in LANGS:
+                    problems.append(
+                        f"[{folder}] '{base}' language '{m.group('lang')}' "
+                        f"is not one of {', '.join(LANGS)}"
+                    )
+                want = (int(m.group("w")), int(m.group("h")))
+                if op == "png" and want not in HERO_SIZES:
+                    problems.append(f"[{folder}] '{base}' in hero/ is not 2360x760")
+                if op == "jpg" and want not in PROMO_SIZES and not allow_offspec:
+                    problems.append(
+                        f"[{folder}] '{base}' in promo/ is not a standard promo size "
+                        "(pass --allow-offspec if this is a deliberate one-off)"
+                    )
+
+                info = probe(src)
+                if info is None:
+                    problems.append(f"[{folder}] cannot read image: {src}")
+                    continue
+                if (info["w"], info["h"]) != want and not allow_dim_mismatch:
+                    problems.append(
+                        f"[{folder}] '{base}' claims {want[0]}x{want[1]} but the file "
+                        f"is {info['w']}x{info['h']} — rename it or pass --allow-dim-mismatch"
+                    )
+                if op == "jpg" and not info["opaque"] and not entry.get("background"):
+                    problems.append(
+                        f"[{folder}] '{base}' has real transparency and JPG has no alpha — "
+                        "set \"background\": \"#RRGGBB\" on this entry"
+                    )
+
+            abs_dest = os.path.join(ARCHIVE, folder, dest_rel)
+            if abs_dest in seen:
+                problems.append(
+                    f"[{folder}] two sources map to the same destination: "
+                    f"{seen[abs_dest]} and {src} → {dest_rel}"
+                )
+            seen[abs_dest] = src
+            plan.append({
+                "folder": folder, "src": src, "dest": abs_dest,
+                "dest_rel": dest_rel, "op": op,
+                "background": entry.get("background"),
+            })
+
+        figma = p.get("figma_url")
+        if figma:
+            plan.append({
+                "folder": folder, "src": None,
+                "dest": os.path.join(ARCHIVE, folder, "sources-in-figma.txt"),
+                "dest_rel": "sources-in-figma.txt", "op": "figma",
+                "background": None, "text": figma,
+            })
+
+    if problems:
+        raise Fail(
+            "manifest has %d problem(s):\n%s"
+            % (len(problems), "\n".join("  - " + x for x in problems))
+        )
+    return plan
+
+
+def do_png(src, dest, tmpdir):
+    """Palette-quantise to PNG8+alpha — the same libimagequant TinyPNG uses."""
+    stage = src
+    if os.path.splitext(src)[1].lower() != ".png":
+        stage = os.path.join(tmpdir, "stage.png")
+        r = run(["magick", src + "[0]", "-strip", stage])
+        if r.returncode != 0:
+            return None, f"convert to png failed: {r.stderr.strip()}"
+    for quality in (PNGQUANT_QUALITY, None):
+        cmd = ["pngquant", "--force", "--strip", "--speed", "1", "--output", dest]
+        if quality:
+            cmd += ["--quality", quality]
+        cmd += ["--", stage]
+        r = run(cmd)
+        if r.returncode == 0:
+            return os.path.getsize(dest), None
+    return None, "pngquant could not hit the quality floor"
+
+
+def do_jpg(src, dest, background):
+    cmd = ["magick", src + "[0]"]
+    if background:
+        cmd += ["-background", background, "-alpha", "remove", "-alpha", "off"]
+    cmd += [
+        # -type TrueColor keeps a near-monochrome banner from being written as a
+        # single-channel grayscale JPEG, which the archive never uses.
+        "-colorspace", "sRGB", "-type", "TrueColor", "-strip",
+        "-sampling-factor", JPEG_SAMPLING,
+        "-quality", str(JPEG_QUALITY), dest,
+    ]
+    r = run(cmd)
+    if r.returncode != 0:
+        return None, r.stderr.strip()
+    return os.path.getsize(dest), None
+
+
+def cmd_apply(args):
+    require("identify", "magick", "pngquant")
+    with open(args.manifest) as fh:
+        manifest = json.load(fh)
+
+    plan = plan_manifest(
+        manifest,
+        allow_dim_mismatch=args.allow_dim_mismatch,
+        allow_offspec=args.allow_offspec,
+    )
+
+    clobber = [p for p in plan if os.path.exists(p["dest"])]
+    mode = "APPLY" if args.force else "DRY RUN"
+    print(f"=== {mode} — {len(plan)} file(s) into {ARCHIVE}\n")
+
+    folders = sorted({p["folder"] for p in plan})
+    for folder in folders:
+        print(f"{folder}/")
+        for p in [x for x in plan if x["folder"] == folder]:
+            mark = "!" if os.path.exists(p["dest"]) else " "
+            if p["op"] == "figma":
+                print(f" {mark}  sources-in-figma.txt   ← {p['text']}")
+                continue
+            before = human(os.path.getsize(p["src"]))
+            bg = f"  bg={p['background']}" if p["background"] else ""
+            print(f" {mark}  {p['dest_rel']:<52} ← {before:>7}  {os.path.basename(p['src'])}{bg}")
+        print()
+
+    if clobber:
+        print(f"! {len(clobber)} destination(s) already exist and would be overwritten.")
+        print("  Note: overwriting is safe for links, but renaming or moving a promotion")
+        print("  breaks every Dropbox link already sent for it.\n")
+
+    if not args.force:
+        print("Nothing written. Re-run with --force to apply.")
+        return 0
+
+    written, saved_before, saved_after = 0, 0, 0
+    for p in plan:
+        os.makedirs(os.path.dirname(p["dest"]), exist_ok=True)
+        if p["op"] == "figma":
+            with open(p["dest"], "w") as fh:
+                fh.write(p["text"].rstrip() + "\n")
+            print(f"  wrote  {p['folder']}/sources-in-figma.txt")
+            written += 1
+            continue
+
+        src_size = os.path.getsize(p["src"])
+        with tempfile.TemporaryDirectory() as tmp:
+            if p["op"] == "png":
+                size, err = do_png(p["src"], p["dest"], tmp)
+            elif p["op"] == "jpg":
+                size, err = do_jpg(p["src"], p["dest"], p["background"])
+            else:
+                shutil.copy2(p["src"], p["dest"])
+                size, err = os.path.getsize(p["dest"]), None
+        if err:
+            print(f"  FAILED {p['folder']}/{p['dest_rel']}: {err}", file=sys.stderr)
+            continue
+        written += 1
+        saved_before += src_size
+        saved_after += size
+        pct = (100.0 * size / src_size) if src_size else 100.0
+        # Growth is legal — placement dictates format regardless of size — but it
+        # usually means the designer supplied a flat PNG that JPEG cannot beat.
+        flag = "  ← grew" if p["op"] != "copy" and size > src_size else ""
+        print(f"  wrote  {p['folder']}/{p['dest_rel']}  "
+              f"{human(src_size)} → {human(size)} ({pct:.0f}%){flag}")
+
+    print(f"\n{written}/{len(plan)} written.")
+    if saved_before:
+        print(f"images: {human(saved_before)} → {human(saved_after)} "
+              f"({100.0 * saved_after / saved_before:.0f}% of input)")
+    print("\nNext:")
+    for folder in folders:
+        print(f"  promo check {folder}")
+    return 0
+
+
+# ---------------------------------------------------------------- check
+
+def cmd_check(args):
+    require("identify")
+    target = args.folder
+    root = target if os.path.isabs(target) else os.path.join(ARCHIVE, target)
+    root = os.path.normpath(root)
+    if not os.path.isdir(root):
+        raise Fail(f"no such promotion folder: {root}")
+
+    name = os.path.basename(root)
+    problems, notes, skipped = [], [], 0
+
+    if not FOLDER_RE.match(name):
+        problems.append(f"folder name '{name}' does not match YYYYMM-vertical-name")
+
+    upload = os.path.join(root, "upload")
+    if not os.path.isdir(upload):
+        problems.append("no upload/ directory")
+        return report(name, problems, notes, skipped)
+
+    for stray in sorted(os.listdir(upload)):
+        if not is_junk(stray) and os.path.isfile(os.path.join(upload, stray)):
+            problems.append(f"stray file directly in upload/: {stray}")
+
+    langs_seen = {"hero": set(), "promo": set()}
+    sizes_by_lang = {}
+    offspec_sizes = set()
+
+    for sub, good_ext, good_sizes in (
+        ("hero", {".png"}, HERO_SIZES),
+        ("promo", {".jpg"}, PROMO_SIZES),
+    ):
+        sd = os.path.join(upload, sub)
+        if not os.path.isdir(sd):
+            problems.append(f"no upload/{sub}/ directory")
+            continue
+        files = [f for f in sorted(os.listdir(sd)) if not is_junk(f)]
+        if not files:
+            problems.append(f"upload/{sub}/ is empty")
+        for fn in files:
+            fp = os.path.join(sd, fn)
+            ext = os.path.splitext(fn)[1].lower()
+            if ext not in good_ext:
+                problems.append(
+                    f"upload/{sub}/{fn} is {ext} — {sub} assets must be "
+                    f"{'PNG' if sub == 'hero' else 'JPG'}"
+                )
+            m = FILENAME_RE.match(fn)
+            if not m:
+                problems.append(f"upload/{sub}/{fn} does not match <Name>_<W>x<H>[_<LANG>].<ext>")
+                continue
+            lang = m.group("lang") or "-"
+            langs_seen[sub].add(lang)
+            want = (int(m.group("w")), int(m.group("h")))
+            if want not in good_sizes:
+                notes.append(f"upload/{sub}/{fn} is an off-spec size {want[0]}x{want[1]}")
+                if sub == "promo":
+                    offspec_sizes.add(want)
+            elif sub == "promo":
+                sizes_by_lang.setdefault(lang, set()).add(want)
+
+            if is_placeholder(fp):
+                skipped += 1
+                continue
+            info = probe(fp)
+            if info is None:
+                problems.append(f"upload/{sub}/{fn} is unreadable")
+            elif (info["w"], info["h"]) != want:
+                problems.append(
+                    f"upload/{sub}/{fn} claims {want[0]}x{want[1]} "
+                    f"but is actually {info['w']}x{info['h']}"
+                )
+
+    for lang, sizes in sorted(sizes_by_lang.items()):
+        missing = PROMO_SIZES - sizes
+        if missing:
+            label = "language-neutral" if lang == "-" else lang
+            parts = []
+            for w, h in sorted(missing):
+                # An off-spec file at nearly the right size is almost always the
+                # standard one exported short — say so rather than leave a puzzle.
+                near = [
+                    (ow, oh) for ow, oh in offspec_sizes
+                    if ow == w and abs(oh - h) <= 64
+                ]
+                if near:
+                    parts.append(
+                        "%dx%d (%s present — looks like a short export)"
+                        % (w, h, ", ".join(f"{a}x{b}" for a, b in near))
+                    )
+                else:
+                    parts.append(f"{w}x{h}")
+            problems.append(
+                "promo set incomplete for %s — missing %s" % (label, ", ".join(parts))
+            )
+
+    if langs_seen["hero"] and langs_seen["promo"] and langs_seen["hero"] != langs_seen["promo"]:
+        notes.append(
+            "hero languages %s do not match promo languages %s"
+            % (sorted(langs_seen["hero"]), sorted(langs_seen["promo"]))
+        )
+
+    return report(name, problems, notes, skipped)
+
+
+def report(name, problems, notes, skipped):
+    print(f"=== {name}")
+    if skipped:
+        print(f"({skipped} file(s) are Dropbox online-only stubs — "
+              "dimensions not verified, content left in the cloud)")
+    for n in notes:
+        print(f"  note  {n}")
+    if problems:
+        for p in problems:
+            print(f"  FAIL  {p}")
+        print(f"\n{len(problems)} problem(s).")
+        return 1
+    print("  OK — ready to share upload/")
+    print(f"\n  reveal in Finder:  open -R \"{os.path.join(ARCHIVE, name, 'upload')}\"")
+    return 0
+
+
+# ---------------------------------------------------------------- cli
+
+def main():
+    ap = argparse.ArgumentParser(
+        prog="promo", description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    f = sub.add_parser("fetch", help="download a public Drive folder to staging")
+    f.add_argument("url")
+    f.add_argument("--to", default="./staging")
+    f.add_argument("--list", action="store_true",
+                   help="show the folder contents without downloading anything")
+    f.add_argument("--images-only", action="store_true",
+                   help="skip PSDs and other working files (they are fetched by default)")
+    f.add_argument("--python", help="path to a python with gdown installed")
+    f.set_defaults(fn=cmd_fetch)
+
+    i = sub.add_parser("inventory", help="probe every image and classify it")
+    i.add_argument("dir")
+    i.add_argument("--json", action="store_true")
+    i.set_defaults(fn=cmd_inventory)
+
+    t = sub.add_parser("thumbs", help="small JPEGs of ambiguous files")
+    t.add_argument("files", nargs="+")
+    t.add_argument("--out", default="./thumbs")
+    t.add_argument("--width", type=int, default=400)
+    t.set_defaults(fn=cmd_thumbs)
+
+    a = sub.add_parser("apply", help="convert, minify and file (dry-run by default)")
+    a.add_argument("manifest")
+    a.add_argument("--force", action="store_true", help="actually write")
+    a.add_argument("--allow-dim-mismatch", action="store_true")
+    a.add_argument("--allow-offspec", action="store_true")
+    a.set_defaults(fn=cmd_apply)
+
+    c = sub.add_parser("check", help="validate a filed promotion")
+    c.add_argument("folder")
+    c.set_defaults(fn=cmd_check)
+
+    args = ap.parse_args()
+    try:
+        return args.fn(args)
+    except Fail as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        return 130
+
+
+if __name__ == "__main__":
+    sys.exit(main())
